@@ -1,0 +1,92 @@
+:root {
+  --columbia-blue: #bfd7ea;
+  --tea-green: #caffb9;
+  --wine: #653239;
+  --charcoal: #383f51;
+  --maize: #fff689;
+  --white: #ffffff;
+}
+
+/* Navbar Colors */
+.bg-charcoal {
+  background-color: var(--charcoal) !important;
+}
+
+/* Text Colors */
+.text-charcoal {
+  color: var(--charcoal);
+}
+
+/* Logout Button */
+.btn-logout {
+  background: var(--wine);
+  color: var(--white);
+  font-weight: 500;
+  border: none;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  transition: background 0.2s ease-in-out;
+}
+
+.btn-logout:hover {
+  background: #4b2329;
+  transform: scale(1.03);
+}
+
+/* Status Badges */
+.status.pending {
+  background-color: var(--maize);
+  color: #7a6000;
+}
+
+.status.approved {
+  background-color: var(--tea-green);
+  color: #1b4332;
+}
+
+.status.rejected {
+  background-color: var(--wine);
+  color: var(--white);
+}
+
+/* Buttons */
+.btn-approve {
+  background-color: var(--tea-green);
+  color: #1b4332;
+  font-weight: 500;
+  border: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-approve:hover {
+  background-color: #b3f1a1;
+  transform: scale(1.05);
+}
+
+.btn-reject {
+  background-color: var(--wine);
+  color: var(--white);
+  font-weight: 500;
+  border: none;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-reject:hover {
+  background-color: #4b2329;
+  transform: scale(1.05);
+}
+
+/* Highlight */
+.highlight {
+  background: var(--maize);
+  color: #7a6000;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* Body */
+body {
+  background-color: var(--columbia-blue);
+}
