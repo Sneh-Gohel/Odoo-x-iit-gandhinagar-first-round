@@ -45,6 +45,21 @@ function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Function to determine dashboard based on role
+  const getDashboardRoute = (role) => {
+    switch (role) {
+      case 'Admin':
+        return '/adminDashboard';
+      case 'Manager':
+        return '/managerDashboard';
+      case 'Employee':
+        return '/empDashboard';
+      default:
+        alert('Unknown user');
+        return '/login'; // Fallback route
+    }
+  };
+
   // Real API call to your backend
   const loginUser = async (email, password) => {
     const API_URL = 'http://192.168.137.166:5000';
@@ -93,12 +108,16 @@ function Login() {
       // Store remember me preference
       if (formData.rememberMe) {
         localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedEmail', formData.email);
       } else {
         localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedEmail');
       }
       
-      // Navigate to dashboard
-      navigate('/adminDashboard');
+      // Navigate to appropriate dashboard based on role
+      const userRole = response.user.role;
+      const dashboardRoute = getDashboardRoute(userRole);
+      navigate(dashboardRoute);
       
     } catch (error) {
       console.error('Login error:', error);
@@ -107,6 +126,20 @@ function Login() {
       setIsLoading(false);
     }
   };
+
+  // Load saved email if remember me was checked
+  React.useEffect(() => {
+    const savedEmail = localStorage.getItem('savedEmail');
+    const rememberMe = localStorage.getItem('rememberMe');
+    
+    if (savedEmail && rememberMe === 'true') {
+      setFormData(prev => ({
+        ...prev,
+        email: savedEmail,
+        rememberMe: true
+      }));
+    }
+  }, []);
 
   return (
     <div className="container-fluid vh-100" style={{ 
@@ -190,7 +223,7 @@ function Login() {
                       Remember me
                     </label>
                   </div>
-                  <Link to="/forgot-password" className="text-decoration-none">
+                  <Link to="/forgotPassword" className="text-decoration-none">
                     Forgot password?
                   </Link>
                 </div>
@@ -222,10 +255,8 @@ function Login() {
                 <p className="text-muted mb-2">
                   Don't have an account? <Link to="/signup" className="text-decoration-none">Sign up</Link>
                 </p>
-                <small className="text-muted">
-                  Your company will be automatically created during signup
-                </small>
               </div>
+
             </div>
           </div>
         </div>
