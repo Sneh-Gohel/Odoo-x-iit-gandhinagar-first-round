@@ -6,13 +6,14 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({
     name: "",
     role: "Employee",
     manager_id: "",
     email: "",
-    password: "defaultpassword123" // Default password
+    password: "defaultpassword123"
   });
 
   // Color Palette
@@ -49,7 +50,8 @@ export default function AdminDashboard() {
         role: user.role,
         manager: user.manager_name || "-",
         email: user.email,
-        manager_id: user.manager_id
+        manager_id: user.manager_id,
+        approvalRules: user.approval_rules || "Default Rules"
       }));
       
       setUsers(formattedUsers);
@@ -57,12 +59,38 @@ export default function AdminDashboard() {
       console.error("Error fetching users:", err);
       // Fallback to mock data if API fails
       setUsers([
-        { id: 1, name: "John Doe", role: "Manager", manager: "-", email: "pramukhprajapati17@gmail.com" },
-        { id: 2, name: "Sarah Smith", role: "Employee", manager: "John Doe", email: "sarah@company.com" },
-        { id: 3, name: "Mike Johnson", role: "Employee", manager: "John Doe", email: "mike@company.com" },
-        { id: 4, name: "Lisa Brown", role: "Admin", manager: "-", email: "lisa@company.com" },
-        { id: 5, name: "David Wilson", role: "Manager", manager: "-", email: "david@company.com" },
-        { id: 6, name: "Emma Davis", role: "Employee", manager: "David Wilson", email: "emma@company.com" }
+        { 
+          id: 1, 
+          name: "John Doe", 
+          role: "Manager", 
+          manager: "-", 
+          email: "pramukhprajapati17@gmail.com",
+          approvalRules: "Manager → Finance → Director"
+        },
+        { 
+          id: 2, 
+          name: "Sarah Smith", 
+          role: "Employee", 
+          manager: "John Doe", 
+          email: "sarah@company.com",
+          approvalRules: "Manager Only"
+        },
+        { 
+          id: 3, 
+          name: "Mike Johnson", 
+          role: "Employee", 
+          manager: "John Doe", 
+          email: "mike@company.com",
+          approvalRules: "Manager → Director"
+        },
+        { 
+          id: 4, 
+          name: "Lisa Brown", 
+          role: "Admin", 
+          manager: "-", 
+          email: "lisa@company.com",
+          approvalRules: "Finance Only"
+        }
       ]);
     } finally {
       setLoading(false);
@@ -123,7 +151,8 @@ export default function AdminDashboard() {
         role: addedUser.role,
         manager: addedUser.manager_name || "-",
         email: addedUser.email,
-        manager_id: addedUser.manager_id
+        manager_id: addedUser.manager_id,
+        approvalRules: "Default Rules"
       };
       
       setUsers(prev => [...prev, formattedUser]);
@@ -178,30 +207,39 @@ export default function AdminDashboard() {
     }
   };
 
-  // Save Approval Rule
-  const handleSaveRule = async (e) => {
+  // Show Approval Rules
+  const handleShowRules = (user) => {
+    setSelectedUser(user);
+    setShowRules(true);
+  };
+
+  // Save Approval Rule for specific user
+  const handleSaveUserRule = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
       const formData = new FormData(e.target);
       const ruleData = {
-        name: formData.get('ruleName'),
-        minApprovalPercentage: parseInt(formData.get('minApproval')),
-        isManagerApprover: formData.get('managerApprover') === 'on',
-        sequence: formData.get('approvalSequence')
+        userId: selectedUser.id,
+        ruleName: formData.get('userRuleName'),
+        minApprovalPercentage: parseInt(formData.get('userMinApproval')),
+        isManagerApprover: formData.get('userManagerApprover') === 'on',
+        sequence: formData.get('userApprovalSequence'),
+        autoApproveLimit: parseFloat(formData.get('autoApproveLimit'))
       };
 
-      await axios.post(`${API_URL}/api/admin/approval-rules`, ruleData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Update user's approval rules in the state
+      setUsers(prev => prev.map(user => 
+        user.id === selectedUser.id 
+          ? { ...user, approvalRules: ruleData.ruleName }
+          : user
+      ));
+
+      setShowRules(false);
+      alert(`Approval rules updated for ${selectedUser.name}!`);
       
-      alert("Rule Saved Successfully!");
-      e.target.reset();
     } catch (err) {
-      alert("Error saving rule.");
+      alert("Error saving user rules.");
       console.error(err);
     }
   };
@@ -269,113 +307,9 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="container-fluid py-4">
-        <div className="row g-4">
-          {/* APPROVAL RULES SECTION - Left Side for larger screens */}
-          <div className="col-12 col-xl-4 col-xxl-3">
-            <div className="card shadow-sm border-0 h-100">
-              <div className="card-header border-0 py-3"
-                   style={{ backgroundColor: colors.teaGreen }}>
-                <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
-                  <i className="bi bi-diagram-3 me-2"></i>
-                  Approval Rules
-                </h5>
-              </div>
-              
-              <div className="card-body">
-                <form onSubmit={handleSaveRule}>
-                  <div className="mb-3">
-                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
-                      Rule Name
-                    </label>
-                    <input 
-                      type="text" 
-                      name="ruleName"
-                      className="form-control"
-                      placeholder="Manager → Finance → Director"
-                      style={{ 
-                        borderColor: colors.columbiaBlue,
-                        color: colors.charcoal
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
-                      Minimum Approval Percentage
-                    </label>
-                    <input 
-                      type="number" 
-                      name="minApproval"
-                      className="form-control"
-                      placeholder="60"
-                      min="0"
-                      max="100"
-                      style={{ 
-                        borderColor: colors.columbiaBlue,
-                        color: colors.charcoal
-                      }}
-                      required
-                    />
-                  </div>
-
-                  <div className="mb-3 form-check">
-                    <input 
-                      type="checkbox" 
-                      name="managerApprover"
-                      className="form-check-input"
-                      id="managerApprover"
-                      style={{ 
-                        borderColor: colors.columbiaBlue
-                      }}
-                    />
-                    <label className="form-check-label" htmlFor="managerApprover" style={{ color: colors.charcoal }}>
-                      Is Manager Approver
-                    </label>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
-                      Approval Sequence
-                    </label>
-                    <select 
-                      name="approvalSequence"
-                      className="form-select"
-                      style={{ 
-                        borderColor: colors.columbiaBlue,
-                        color: colors.charcoal
-                      }}
-                      required
-                    >
-                      <option value="Manager → Finance → Director">Manager → Finance → Director</option>
-                      <option value="Manager → Director">Manager → Director</option>
-                      <option value="Finance Only">Finance Only</option>
-                      <option value="Director Only">Director Only</option>
-                    </select>
-                  </div>
-
-                  <div className="d-grid">
-                    <button 
-                      type="submit"
-                      className="btn border-0 fw-medium py-2"
-                      style={{
-                        backgroundColor: colors.wine,
-                        color: colors.white
-                      }}
-                      onMouseOver={(e) => e.target.style.backgroundColor = colors.charcoal}
-                      onMouseOut={(e) => e.target.style.backgroundColor = colors.wine}
-                    >
-                      <i className="bi bi-check-circle me-2"></i>
-                      Save Rule
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-
-          {/* USERS SECTION - Main Content on the right */}
-          <div className="col-12 col-xl-8 col-xxl-9">
+        <div className="row">
+          {/* USERS SECTION - Full width without rules section */}
+          <div className="col-12">
             <div className="card shadow-sm border-0">
               <div className="card-header border-0 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 py-3"
                    style={{ backgroundColor: colors.teaGreen }}>
@@ -405,7 +339,7 @@ export default function AdminDashboard() {
                     <p className="mt-2 mb-0" style={{ color: colors.charcoal }}>Loading users...</p>
                   </div>
                 ) : (
-                  <div className="table-responsive" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                  <div className="table-responsive" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                     <table className="table table-hover mb-0">
                       <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                         <tr>
@@ -413,6 +347,7 @@ export default function AdminDashboard() {
                           <th style={{ color: colors.charcoal }}>Role</th>
                           <th className="d-none d-md-table-cell" style={{ color: colors.charcoal }}>Manager</th>
                           <th className="d-none d-lg-table-cell" style={{ color: colors.charcoal }}>Email</th>
+                          <th style={{ color: colors.charcoal }}>Approval Rules</th>
                           <th style={{ color: colors.charcoal }}>Actions</th>
                         </tr>
                       </thead>
@@ -452,6 +387,20 @@ export default function AdminDashboard() {
                             </td>
                             <td className="d-none d-lg-table-cell" style={{ color: colors.charcoal }}>
                               {user.email}
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-sm border-0 text-decoration-underline p-0"
+                                style={{ 
+                                  color: colors.wine,
+                                  backgroundColor: 'transparent',
+                                  fontSize: '0.8rem'
+                                }}
+                                onClick={() => handleShowRules(user)}
+                                title="Click to view/edit approval rules"
+                              >
+                                {user.approvalRules}
+                              </button>
                             </td>
                             <td>
                               <div className="d-flex flex-wrap gap-1">
@@ -568,11 +517,11 @@ export default function AdminDashboard() {
                                color: colors.charcoal,
                                fontSize: '0.7rem'
                              }}>
-                          <i className="bi bi-key"></i>
+                          <i className="bi bi-rule"></i>
                         </div>
                         <div className="flex-grow-1">
-                          <small className="d-block" style={{ color: colors.charcoal }}>Password reset</small>
-                          <small className="text-muted">John Doe - 5 hours ago</small>
+                          <small className="d-block" style={{ color: colors.charcoal }}>Rules updated</small>
+                          <small className="text-muted">John Doe - 3 hours ago</small>
                         </div>
                       </div>
                       <div className="list-group-item px-0 border-0 d-flex align-items-center">
@@ -584,11 +533,11 @@ export default function AdminDashboard() {
                                color: colors.charcoal,
                                fontSize: '0.7rem'
                              }}>
-                          <i className="bi bi-rule"></i>
+                          <i className="bi bi-key"></i>
                         </div>
                         <div className="flex-grow-1">
-                          <small className="d-block" style={{ color: colors.charcoal }}>Rule updated</small>
-                          <small className="text-muted">Approval workflow - Yesterday</small>
+                          <small className="d-block" style={{ color: colors.charcoal }}>Password reset</small>
+                          <small className="text-muted">Mike Johnson - 5 hours ago</small>
                         </div>
                       </div>
                     </div>
@@ -729,6 +678,152 @@ export default function AdminDashboard() {
                     >
                       <i className="bi bi-person-plus me-2"></i>
                       Add User
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* APPROVAL RULES MODAL */}
+      {showRules && selectedUser && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-0" style={{ backgroundColor: colors.teaGreen }}>
+                <h5 className="modal-title fw-bold" style={{ color: colors.charcoal }}>
+                  <i className="bi bi-diagram-3 me-2"></i>
+                  Approval Rules for {selectedUser.name}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close"
+                  onClick={() => setShowRules(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleSaveUserRule}>
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
+                      Rule Name
+                    </label>
+                    <input 
+                      type="text" 
+                      name="userRuleName"
+                      className="form-control"
+                      placeholder="Manager → Finance → Director"
+                      defaultValue={selectedUser.approvalRules}
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
+                      Minimum Approval Percentage
+                    </label>
+                    <input 
+                      type="number" 
+                      name="userMinApproval"
+                      className="form-control"
+                      placeholder="60"
+                      min="0"
+                      max="100"
+                      defaultValue="60"
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
+                      Auto-approve Limit ($)
+                    </label>
+                    <input 
+                      type="number" 
+                      name="autoApproveLimit"
+                      className="form-control"
+                      placeholder="100"
+                      min="0"
+                      step="0.01"
+                      defaultValue="100"
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                    />
+                    <small className="text-muted">Expenses below this amount will be auto-approved</small>
+                  </div>
+
+                  <div className="mb-3 form-check">
+                    <input 
+                      type="checkbox" 
+                      name="userManagerApprover"
+                      className="form-check-input"
+                      id="userManagerApprover"
+                      defaultChecked
+                      style={{ 
+                        borderColor: colors.columbiaBlue
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor="userManagerApprover" style={{ color: colors.charcoal }}>
+                      Require Manager Approval
+                    </label>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
+                      Approval Sequence
+                    </label>
+                    <select 
+                      name="userApprovalSequence"
+                      className="form-select"
+                      defaultValue="Manager → Finance → Director"
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                      required
+                    >
+                      <option value="Manager Only">Manager Only</option>
+                      <option value="Manager → Finance">Manager → Finance</option>
+                      <option value="Manager → Finance → Director">Manager → Finance → Director</option>
+                      <option value="Finance Only">Finance Only</option>
+                      <option value="Director Only">Director Only</option>
+                    </select>
+                  </div>
+
+                  <div className="d-flex gap-2 justify-content-end">
+                    <button
+                      type="button"
+                      className="btn border-1"
+                      style={{ 
+                        borderColor: colors.wine,
+                        color: colors.wine,
+                        backgroundColor: 'transparent'
+                      }}
+                      onClick={() => setShowRules(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn border-0"
+                      style={{
+                        backgroundColor: colors.wine,
+                        color: colors.white
+                      }}
+                    >
+                      <i className="bi bi-check-circle me-2"></i>
+                      Save Rules
                     </button>
                   </div>
                 </form>
