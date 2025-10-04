@@ -200,6 +200,34 @@ class UserController {
         res.status(500).json({ message: 'Server error during password reset.' });
     }
   }
+  static async getCompanyUsers(req, res) {
+    // req.user is populated by authMiddleware
+    const { companyId, role } = req.user; 
+
+    // Extra check (though adminAuth middleware should handle this)
+    if (role !== 'Admin') {
+      return res.status(403).json({ message: 'Forbidden: Only administrators can view all company users.' });
+    }
+
+    try {
+      const users = await UserModel.findUsersByCompanyId(companyId);
+
+      // Filter out sensitive data like password_hash if present (though model already excludes it)
+      const sanitizedUsers = users.map(user => {
+        const { password_hash, ...rest } = user;
+        return rest;
+      });
+
+      res.status(200).json({
+        message: 'Company users fetched successfully.',
+        users: sanitizedUsers,
+      });
+
+    } catch (error) {
+      console.error('Error fetching company users:', error);
+      res.status(500).json({ message: 'Server error while fetching company users.' });
+    }
+  }
 }
 
 module.exports = UserController;

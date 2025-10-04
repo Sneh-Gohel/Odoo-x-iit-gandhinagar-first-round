@@ -1,6 +1,8 @@
 // src/api/userRoutes.js
 const express = require('express');
 const UserController = require('../controllers/userController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminAuth = require('../middleware/adminAuth');
 
 const router = express.Router();
 
@@ -15,5 +17,7 @@ router.post('/login', UserController.loginUser);
 
 router.post('/forgot-password', UserController.forgotPassword);
 router.post('/reset-password', UserController.resetPassword);
+
+router.get('/company-users', authMiddleware, adminAuth, UserController.getCompanyUsers);
 
 module.exports = router;
