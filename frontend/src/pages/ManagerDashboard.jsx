@@ -250,6 +250,7 @@ export default function ManagerDashboard() {
               <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
                    style={{ 
                      width: '45px', 
+                     
                      height: '45px',
                      backgroundColor: colors.wine,
                      color: colors.white
