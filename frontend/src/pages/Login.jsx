@@ -98,7 +98,7 @@ function Login() {
       }
       
       // Navigate to dashboard
-      navigate('/dashboard');
+      navigate('/adminDashboard');
       
     } catch (error) {
       console.error('Login error:', error);

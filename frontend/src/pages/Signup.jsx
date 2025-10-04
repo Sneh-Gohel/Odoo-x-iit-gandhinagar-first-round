@@ -136,7 +136,8 @@ function Signup() {
       if (response.company) {
         localStorage.setItem('company', JSON.stringify(response.company));
       }
-      navigate('/dashboard');
+      alert('Signup successful!');
+      navigate('/login');
     } catch (error) {
       setErrors({ submit: error.message });
     } finally {
