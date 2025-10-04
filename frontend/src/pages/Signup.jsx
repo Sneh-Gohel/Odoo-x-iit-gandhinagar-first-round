@@ -4,9 +4,11 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 function Signup() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
+    companyName: '',
+    defaultCurrencyCode: 'USD',
+    adminName: '',
+    adminEmail: '',
+    adminPassword: '',
     confirmPassword: ''
   });
 
@@ -41,12 +43,14 @@ function Signup() {
   const validateSignupForm = () => {
     const newErrors = {};
     
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!formData.companyName.trim()) newErrors.companyName = 'Company name is required';
+    if (!formData.adminName.trim()) newErrors.adminName = 'Admin name is required';
+    if (!formData.adminEmail.trim()) newErrors.adminEmail = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.adminEmail)) newErrors.adminEmail = 'Invalid email format';
+    if (!formData.adminPassword) newErrors.adminPassword = 'Password is required';
+    else if (formData.adminPassword.length < 6) newErrors.adminPassword = 'Password must be at least 6 characters';
+    if (formData.adminPassword !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!formData.defaultCurrencyCode) newErrors.defaultCurrencyCode = 'Currency is required';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -64,34 +68,41 @@ function Signup() {
   };
 
   const sendOtp = async () => {
-    const API_URL = 'http://localhost:3000';
-    const response = await fetch(`${API_URL}/api/auth/send-otp`, {
+    const API_URL = 'http://192.168.137.166:5000';
+    const response = await fetch(`${API_URL}/api/users/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: formData.email,
-        name: formData.name
+        companyName: formData.companyName,
+        defaultCurrencyCode: formData.defaultCurrencyCode,
+        adminName: formData.adminName,
+        adminEmail: formData.adminEmail,
+        adminPassword: formData.adminPassword
       })
     });
 
-    if (!response.ok) throw new Error('Failed to send OTP');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to send OTP');
+    }
     return await response.json();
   };
 
   const verifyOtpAndSignup = async () => {
-    const API_URL = 'http://localhost:3000';
-    const response = await fetch(`${API_URL}/api/auth/verify-signup`, {
+    const API_URL = 'http://192.168.137.166:5000';
+    const response = await fetch(`${API_URL}/api/users/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
+        email: formData.adminEmail,
         otp: otp
       })
     });
 
-    if (!response.ok) throw new Error('Signup failed');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Signup failed');
+    }
     return await response.json();
   };
 
@@ -101,8 +112,10 @@ function Signup() {
     
     setIsLoading(true);
     try {
-      await sendOtp();
+      const result = await sendOtp();
       setStep(2);
+      // Show success message if needed
+      console.log(result.message);
     } catch (error) {
       setErrors({ submit: error.message });
     } finally {
@@ -119,7 +132,10 @@ function Signup() {
       const response = await verifyOtpAndSignup();
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
-      localStorage.setItem('company', JSON.stringify(response.company));
+      // Note: The company data might be included in the user object or separately
+      if (response.company) {
+        localStorage.setItem('company', JSON.stringify(response.company));
+      }
       navigate('/dashboard');
     } catch (error) {
       setErrors({ submit: error.message });
@@ -128,12 +144,18 @@ function Signup() {
     }
   };
 
+  // Common currency codes
+  const currencyCodes = [
+    'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'INR', 'SGD',
+    'MYR', 'IDR', 'THB', 'VND', 'PHP', 'KRW', 'AED', 'SAR', 'QAR', 'OMR'
+  ];
+
   return (
     <div className="container-fluid vh-100" style={{ 
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
     }}>
       <div className="row h-100 justify-content-center align-items-center">
-        <div className="col-12 col-md-8 col-lg-5 col-xl-4">
+        <div className="col-12 col-md-8 col-lg-6 col-xl-5">
           <div className="card shadow-lg border-0">
             <div className="card-body p-4">
               
@@ -146,7 +168,7 @@ function Signup() {
                   </div>
                   <div>
                     <h4 className="fw-bold text-dark mb-0">ExpenseFlow</h4>
-                    <p className="text-muted small mb-0">Create Account</p>
+                    <p className="text-muted small mb-0">Create Company Account</p>
                   </div>
                 </div>
                 
@@ -164,36 +186,71 @@ function Signup() {
                 </div>
               </div>
 
-              {/* Step 1: Signup Form */}
+              {/* Step 1: Company Signup Form */}
               {step === 1 && (
                 <form onSubmit={handleSendOtp}>
                   <div className="mb-3">
-                    <label className="form-label fw-medium small">Full Name</label>
+                    <label className="form-label fw-medium small">Company Name</label>
                     <input
                       type="text"
-                      name="name"
-                      value={formData.name}
+                      name="companyName"
+                      value={formData.companyName}
                       onChange={handleChange}
-                      className={`form-control ${errors.name ? 'is-invalid' : ''}`}
-                      placeholder="Enter your full name"
+                      className={`form-control ${errors.companyName ? 'is-invalid' : ''}`}
+                      placeholder="Enter your company name"
                     />
-                    {errors.name && (
-                      <div className="invalid-feedback small">{errors.name}</div>
+                    {errors.companyName && (
+                      <div className="invalid-feedback small">{errors.companyName}</div>
                     )}
                   </div>
 
                   <div className="mb-3">
-                    <label className="form-label fw-medium small">Email</label>
+                    <label className="form-label fw-medium small">Default Currency</label>
+                    <select
+                      name="defaultCurrencyCode"
+                      value={formData.defaultCurrencyCode}
+                      onChange={handleChange}
+                      className={`form-select ${errors.defaultCurrencyCode ? 'is-invalid' : ''}`}
+                    >
+                      <option value="">Select currency</option>
+                      {currencyCodes.map(currency => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.defaultCurrencyCode && (
+                      <div className="invalid-feedback small">{errors.defaultCurrencyCode}</div>
+                    )}
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium small">Admin Name</label>
+                    <input
+                      type="text"
+                      name="adminName"
+                      value={formData.adminName}
+                      onChange={handleChange}
+                      className={`form-control ${errors.adminName ? 'is-invalid' : ''}`}
+                      placeholder="Enter admin full name"
+                    />
+                    {errors.adminName && (
+                      <div className="invalid-feedback small">{errors.adminName}</div>
+                    )}
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium small">Admin Email</label>
                     <input
                       type="email"
-                      name="email"
-                      value={formData.email}
+                      name="adminEmail"
+                      value={formData.adminEmail}
                       onChange={handleChange}
-                      className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                      placeholder="Enter your email"
+                      className={`form-control ${errors.adminEmail ? 'is-invalid' : ''}`}
+                      placeholder="Enter admin email"
                     />
-                    {errors.email && (
-                      <div className="invalid-feedback small">{errors.email}</div>
+                    {errors.adminEmail && (
+                      <div className="invalid-feedback small">{errors.adminEmail}</div>
                     )}
                   </div>
 
@@ -201,14 +258,14 @@ function Signup() {
                     <label className="form-label fw-medium small">Password</label>
                     <input
                       type="password"
-                      name="password"
-                      value={formData.password}
+                      name="adminPassword"
+                      value={formData.adminPassword}
                       onChange={handleChange}
-                      className={`form-control ${errors.password ? 'is-invalid' : ''}`}
+                      className={`form-control ${errors.adminPassword ? 'is-invalid' : ''}`}
                       placeholder="Create password"
                     />
-                    {errors.password && (
-                      <div className="invalid-feedback small">{errors.password}</div>
+                    {errors.adminPassword && (
+                      <div className="invalid-feedback small">{errors.adminPassword}</div>
                     )}
                   </div>
 
@@ -260,7 +317,7 @@ function Signup() {
                   <div className="text-center mb-4">
                     <h6 className="fw-semibold">Verify Your Email</h6>
                     <p className="text-muted small mb-2">
-                      OTP sent to <strong>{formData.email}</strong>
+                      OTP sent to <strong>{formData.adminEmail}</strong>
                     </p>
                     <small className="text-muted">Enter the 6-digit code we sent to your email</small>
                   </div>

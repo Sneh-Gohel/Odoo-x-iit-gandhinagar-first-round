@@ -250,10 +250,8 @@ function EmployeeDashboard() {
                     {formatCurrency(stats.toSubmit, 'INR')}
                   </h6>
                   <small style={{ color: colors.wine }}>To submit</small>
-                  <div className="mt-2">
-                    <small style={{ color: colors.charcoal }}>Imaginative Crab</small>
-                  </div>
                 </div>
+                
                 
                 <div className="p-3 rounded border-0" style={{ 
                   backgroundColor: colors.teaGreen
@@ -262,11 +260,14 @@ function EmployeeDashboard() {
                     {formatCurrency(stats.waitingApproval, 'INR')}
                   </h6>
                   <small style={{ color: colors.wine }}>Waiting approval</small>
-                  <div className="mt-2">
-                    <small style={{ color: colors.charcoal }}>
-                      {formatCurrency(stats.approved, 'INR')} Approved
-                    </small>
-                  </div>
+                </div>
+                <div className="p-3 mt-3 rounded border-0" style={{ 
+                  backgroundColor: colors.teaGreen
+                }}>
+                  <h6 className="fw-bold mb-1" style={{ color: colors.charcoal }}>
+                    {formatCurrency(stats.waitingApproval, 'INR')}
+                  </h6>
+                  <small style={{ color: colors.wine }}>Approved</small>
                 </div>
               </div>
             </div>

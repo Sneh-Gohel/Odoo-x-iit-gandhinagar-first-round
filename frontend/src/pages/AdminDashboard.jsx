@@ -23,30 +23,55 @@ export default function AdminDashboard() {
     white: '#FFFFFF'
   };
 
+  const API_URL = 'http://localhost:3000';
+
   // Fetch all users
   useEffect(() => {
-    async function fetchUsers() {
-      try {
-        setLoading(true);
-        // Mock data for demonstration
-        setTimeout(() => {
-          setUsers([
-            { id: 1, name: "John Doe", role: "Manager", manager: "-", email: "john@company.com" },
-            { id: 2, name: "Sarah Smith", role: "Employee", manager: "John Doe", email: "sarah@company.com" },
-            { id: 3, name: "Mike Johnson", role: "Employee", manager: "John Doe", email: "mike@company.com" },
-            { id: 4, name: "Lisa Brown", role: "Admin", manager: "-", email: "lisa@company.com" },
-            { id: 5, name: "David Wilson", role: "Manager", manager: "-", email: "david@company.com" },
-            { id: 6, name: "Emma Davis", role: "Employee", manager: "David Wilson", email: "emma@company.com" }
-          ]);
-          setLoading(false);
-        }, 1000);
-      } catch (err) {
-        console.error("Error fetching users:", err);
-        setLoading(false);
-      }
-    }
     fetchUsers();
+    fetchStats();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      setUsers(response.data.users || response.data);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      // Fallback to mock data if API fails
+      setUsers([
+        { id: 1, name: "John Doe", role: "Manager", manager: "-", email: "pramukhprajapati17@gmail.com" },
+        { id: 2, name: "Sarah Smith", role: "Employee", manager: "John Doe", email: "sarah@company.com" },
+        { id: 3, name: "Mike Johnson", role: "Employee", manager: "John Doe", email: "mike@company.com" },
+        { id: 4, name: "Lisa Brown", role: "Admin", manager: "-", email: "lisa@company.com" },
+        { id: 5, name: "David Wilson", role: "Manager", manager: "-", email: "david@company.com" },
+        { id: 6, name: "Emma Davis", role: "Employee", manager: "David Wilson", email: "emma@company.com" }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.get(`${API_URL}/api/admin/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      // Handle stats data if needed
+    } catch (err) {
+      console.error("Error fetching stats:", err);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -58,9 +83,17 @@ export default function AdminDashboard() {
   // Send Password
   const handleSendPassword = async (user) => {
     try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/api/admin/users/${user.id}/send-password`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       alert(`Password sent to ${user.email}`);
     } catch (err) {
       alert("Failed to send password.");
+      console.error(err);
     }
   };
 
@@ -68,8 +101,15 @@ export default function AdminDashboard() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const mockUser = { id: users.length + 1, ...newUser };
-      setUsers(prev => [...prev, mockUser]);
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}/api/admin/users`, newUser, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      setUsers(prev => [...prev, response.data.user || response.data]);
       setShowAddUser(false);
       alert(`User ${newUser.name} added successfully!`);
       setNewUser({ name: "", role: "Employee", manager: "", email: "" });
@@ -82,6 +122,22 @@ export default function AdminDashboard() {
   // Show History
   const handleShowHistory = async (user) => {
     try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/admin/users/${user.id}/history`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      setSelectedUser({ 
+        ...user, 
+        history: response.data.history || response.data 
+      });
+      setShowHistory(true);
+    } catch (err) {
+      console.error("Failed to load history:", err);
+      // Fallback to mock data
       const mockHistory = [
         { date: "2025-01-15", description: "Office Supplies", amount: "$150", status: "Approved" },
         { date: "2025-01-10", description: "Client Dinner", amount: "$200", status: "Pending" },
@@ -90,8 +146,34 @@ export default function AdminDashboard() {
       ];
       setSelectedUser({ ...user, history: mockHistory });
       setShowHistory(true);
+    }
+  };
+
+  // Save Approval Rule
+  const handleSaveRule = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData(e.target);
+      const ruleData = {
+        name: formData.get('ruleName'),
+        minApprovalPercentage: parseInt(formData.get('minApproval')),
+        isManagerApprover: formData.get('managerApprover') === 'on',
+        sequence: formData.get('approvalSequence')
+      };
+
+      await axios.post(`${API_URL}/api/admin/approval-rules`, ruleData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      alert("Rule Saved Successfully!");
+      e.target.reset();
     } catch (err) {
-      alert("Failed to load history.");
+      alert("Error saving rule.");
+      console.error(err);
     }
   };
 
@@ -168,22 +250,21 @@ export default function AdminDashboard() {
               </div>
               
               <div className="card-body">
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  alert("Rule Saved!");
-                }}>
+                <form onSubmit={handleSaveRule}>
                   <div className="mb-3">
                     <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
                       Rule Name
                     </label>
                     <input 
                       type="text" 
+                      name="ruleName"
                       className="form-control"
                       placeholder="Manager → Finance → Director"
                       style={{ 
                         borderColor: colors.columbiaBlue,
                         color: colors.charcoal
                       }}
+                      required
                     />
                   </div>
 
@@ -193,6 +274,7 @@ export default function AdminDashboard() {
                     </label>
                     <input 
                       type="number" 
+                      name="minApproval"
                       className="form-control"
                       placeholder="60"
                       min="0"
@@ -201,12 +283,14 @@ export default function AdminDashboard() {
                         borderColor: colors.columbiaBlue,
                         color: colors.charcoal
                       }}
+                      required
                     />
                   </div>
 
                   <div className="mb-3 form-check">
                     <input 
                       type="checkbox" 
+                      name="managerApprover"
                       className="form-check-input"
                       id="managerApprover"
                       style={{ 
@@ -223,16 +307,18 @@ export default function AdminDashboard() {
                       Approval Sequence
                     </label>
                     <select 
+                      name="approvalSequence"
                       className="form-select"
                       style={{ 
                         borderColor: colors.columbiaBlue,
                         color: colors.charcoal
                       }}
+                      required
                     >
-                      <option>Manager → Finance → Director</option>
-                      <option>Manager → Director</option>
-                      <option>Finance Only</option>
-                      <option>Director Only</option>
+                      <option value="Manager → Finance → Director">Manager → Finance → Director</option>
+                      <option value="Manager → Director">Manager → Director</option>
+                      <option value="Finance Only">Finance Only</option>
+                      <option value="Director Only">Director Only</option>
                     </select>
                   </div>
 
@@ -252,106 +338,6 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                 </form>
-              </div>
-            </div>
-
-            {/* Quick Stats Card */}
-            <div className="card shadow-sm border-0 mt-4">
-              <div className="card-header border-0 py-3"
-                   style={{ backgroundColor: colors.teaGreen }}>
-                <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
-                  <i className="bi bi-graph-up me-2"></i>
-                  Quick Stats
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row text-center g-2">
-                  <div className="col-4">
-                    <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
-                      <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>{users.length}</h4>
-                      <small style={{ color: colors.charcoal }}>Total Users</small>
-                    </div>
-                  </div>
-                  <div className="col-4">
-                    <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
-                      <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>
-                        {users.filter(u => u.role === 'Manager').length}
-                      </h4>
-                      <small style={{ color: colors.charcoal }}>Managers</small>
-                    </div>
-                  </div>
-                  <div className="col-4">
-                    <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
-                      <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>
-                        {users.filter(u => u.role === 'Admin').length}
-                      </h4>
-                      <small style={{ color: colors.charcoal }}>Admins</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Activity Card */}
-            <div className="card shadow-sm border-0 mt-4">
-              <div className="card-header border-0 py-3"
-                   style={{ backgroundColor: colors.teaGreen }}>
-                <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
-                  <i className="bi bi-activity me-2"></i>
-                  Recent Activity
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="list-group list-group-flush">
-                  <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                         style={{ 
-                           width: '32px', 
-                           height: '32px',
-                           backgroundColor: colors.teaGreen,
-                           color: colors.charcoal,
-                           fontSize: '0.7rem'
-                         }}>
-                      <i className="bi bi-person-plus"></i>
-                    </div>
-                    <div className="flex-grow-1">
-                      <small className="d-block" style={{ color: colors.charcoal }}>New user added</small>
-                      <small className="text-muted">Sarah Smith - 2 hours ago</small>
-                    </div>
-                  </div>
-                  <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                         style={{ 
-                           width: '32px', 
-                           height: '32px',
-                           backgroundColor: colors.teaGreen,
-                           color: colors.charcoal,
-                           fontSize: '0.7rem'
-                         }}>
-                      <i className="bi bi-key"></i>
-                    </div>
-                    <div className="flex-grow-1">
-                      <small className="d-block" style={{ color: colors.charcoal }}>Password reset</small>
-                      <small className="text-muted">John Doe - 5 hours ago</small>
-                    </div>
-                  </div>
-                  <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                         style={{ 
-                           width: '32px', 
-                           height: '32px',
-                           backgroundColor: colors.teaGreen,
-                           color: colors.charcoal,
-                           fontSize: '0.7rem'
-                         }}>
-                      <i className="bi bi-rule"></i>
-                    </div>
-                    <div className="flex-grow-1">
-                      <small className="d-block" style={{ color: colors.charcoal }}>Rule updated</small>
-                      <small className="text-muted">Approval workflow - Yesterday</small>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -387,9 +373,9 @@ export default function AdminDashboard() {
                     <p className="mt-2 mb-0" style={{ color: colors.charcoal }}>Loading users...</p>
                   </div>
                 ) : (
-                  <div className="table-responsive">
+                  <div className="table-responsive" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
                     <table className="table table-hover mb-0">
-                      <thead className="table-light">
+                      <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                         <tr>
                           <th style={{ color: colors.charcoal }}>User</th>
                           <th style={{ color: colors.charcoal }}>Role</th>
@@ -469,6 +455,113 @@ export default function AdminDashboard() {
                     </table>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Quick Stats and Recent Activity below the table */}
+            <div className="row g-4 mt-4">
+              {/* Quick Stats Card */}
+              <div className="col-12 col-md-6">
+                <div className="card shadow-sm border-0 h-100">
+                  <div className="card-header border-0 py-3"
+                       style={{ backgroundColor: colors.teaGreen }}>
+                    <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
+                      <i className="bi bi-graph-up me-2"></i>
+                      Quick Stats
+                    </h5>
+                  </div>
+                  <div className="card-body">
+                    <div className="row text-center g-2">
+                      <div className="col-4">
+                        <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
+                          <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>{users.length}</h4>
+                          <small style={{ color: colors.charcoal }}>Total Users</small>
+                        </div>
+                      </div>
+                      <div className="col-4">
+                        <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
+                          <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>
+                            {users.filter(u => u.role === 'Manager').length}
+                          </h4>
+                          <small style={{ color: colors.charcoal }}>Managers</small>
+                        </div>
+                      </div>
+                      <div className="col-4">
+                        <div className="border rounded p-2" style={{ borderColor: colors.columbiaBlue }}>
+                          <h4 className="mb-0 fw-bold" style={{ color: colors.wine }}>
+                            {users.filter(u => u.role === 'Admin').length}
+                          </h4>
+                          <small style={{ color: colors.charcoal }}>Admins</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity Card */}
+              <div className="col-12 col-md-6">
+                <div className="card shadow-sm border-0 h-100">
+                  <div className="card-header border-0 py-3"
+                       style={{ backgroundColor: colors.teaGreen }}>
+                    <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
+                      <i className="bi bi-activity me-2"></i>
+                      Recent Activity
+                    </h5>
+                  </div>
+                  <div className="card-body">
+                    <div className="list-group list-group-flush">
+                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
+                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style={{ 
+                               width: '32px', 
+                               height: '32px',
+                               backgroundColor: colors.teaGreen,
+                               color: colors.charcoal,
+                               fontSize: '0.7rem'
+                             }}>
+                          <i className="bi bi-person-plus"></i>
+                        </div>
+                        <div className="flex-grow-1">
+                          <small className="d-block" style={{ color: colors.charcoal }}>New user added</small>
+                          <small className="text-muted">Sarah Smith - 2 hours ago</small>
+                        </div>
+                      </div>
+                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
+                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style={{ 
+                               width: '32px', 
+                               height: '32px',
+                               backgroundColor: colors.teaGreen,
+                               color: colors.charcoal,
+                               fontSize: '0.7rem'
+                             }}>
+                          <i className="bi bi-key"></i>
+                        </div>
+                        <div className="flex-grow-1">
+                          <small className="d-block" style={{ color: colors.charcoal }}>Password reset</small>
+                          <small className="text-muted">John Doe - 5 hours ago</small>
+                        </div>
+                      </div>
+                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
+                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                             style={{ 
+                               width: '32px', 
+                               height: '32px',
+                               backgroundColor: colors.teaGreen,
+                               color: colors.charcoal,
+                               fontSize: '0.7rem'
+                             }}>
+                          <i className="bi bi-rule"></i>
+                        </div>
+                        <div className="flex-grow-1">
+                          <small className="d-block" style={{ color: colors.charcoal }}>Rule updated</small>
+                          <small className="text-muted">Approval workflow - Yesterday</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
