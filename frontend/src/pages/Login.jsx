@@ -4,7 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 function Login() {
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
     rememberMe: false
   });
@@ -31,14 +31,14 @@ function Login() {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Invalid email format';
     }
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
     }
     
     setErrors(newErrors);
@@ -46,16 +46,16 @@ function Login() {
   };
 
   // Real API call to your backend
-  const loginUser = async (username, password) => {
-    const API_URL = 'http://localhost:3000'; // Your backend URL
+  const loginUser = async (email, password) => {
+    const API_URL = 'http://192.168.137.166:5000';
     
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const response = await fetch(`${API_URL}/api/users/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        username: username,
+        email: email,
         password: password
       })
     });
@@ -77,25 +77,28 @@ function Login() {
     
     try {
       // API call to your backend
-      const response = await loginUser(formData.username, formData.password);
+      const response = await loginUser(formData.email, formData.password);
       
-      if (response.success) {
-        console.log('Login successful:', response);
-        
-        // Store JWT token and user data
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        
-        // Store company info if available
-        if (response.company) {
-          localStorage.setItem('company', JSON.stringify(response.company));
-        }
-        
-        // Navigate to dashboard
-        navigate('/dashboard');
-      } else {
-        throw new Error(response.message || 'Login failed');
+      console.log('Login successful:', response);
+      
+      // Store JWT token and user data
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      
+      // Store company info if available
+      if (response.company) {
+        localStorage.setItem('company', JSON.stringify(response.company));
       }
+      
+      // Store remember me preference
+      if (formData.rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        localStorage.removeItem('rememberMe');
+      }
+      
+      // Navigate to dashboard
+      navigate('/dashboard');
       
     } catch (error) {
       console.error('Login error:', error);
@@ -130,23 +133,23 @@ function Login() {
 
               {/* Login Form */}
               <form onSubmit={handleSubmit}>
-                <div className="mb-2">
-                  <label htmlFor="username" className="form-label fw-semibold">
-                    Username
+                <div className="mb-3">
+                  <label htmlFor="email" className="form-label fw-semibold">
+                    Email Address
                   </label>
                   <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
                     onChange={handleChange}
-                    className={`form-control form-control-lg ${errors.username ? 'is-invalid' : ''}`}
-                    placeholder="Enter your username"
+                    className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                    placeholder="Enter your email"
                     disabled={isLoading}
                   />
-                  {errors.username && (
+                  {errors.email && (
                     <div className="invalid-feedback d-block">
-                      {errors.username}
+                      {errors.email}
                     </div>
                   )}
                 </div>
@@ -161,7 +164,7 @@ function Login() {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`form-control form-control-lg ${errors.password ? 'is-invalid' : ''}`}
+                    className={`form-control ${errors.password ? 'is-invalid' : ''}`}
                     placeholder="Enter your password"
                     disabled={isLoading}
                   />
@@ -187,9 +190,9 @@ function Login() {
                       Remember me
                     </label>
                   </div>
-                  <a href="/forgot-password" className="text-decoration-none">
+                  <Link to="/forgot-password" className="text-decoration-none">
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
 
                 {errors.submit && (
@@ -200,7 +203,7 @@ function Login() {
 
                 <button 
                   type="submit" 
-                  className={`btn btn-primary btn-lg w-100 py-2 fw-semibold ${isLoading ? 'disabled' : ''}`}
+                  className={`btn btn-primary w-100 py-2 fw-semibold ${isLoading ? 'disabled' : ''}`}
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -216,9 +219,12 @@ function Login() {
 
               {/* Footer */}
               <div className="mt-4 text-center">
-                <p className="text-muted small mb-0">
-                  First time user? <strong>Company will be auto-created</strong> on <Link to="/signup">signup</Link>
+                <p className="text-muted mb-2">
+                  Don't have an account? <Link to="/signup" className="text-decoration-none">Sign up</Link>
                 </p>
+                <small className="text-muted">
+                  Your company will be automatically created during signup
+                </small>
               </div>
             </div>
           </div>
