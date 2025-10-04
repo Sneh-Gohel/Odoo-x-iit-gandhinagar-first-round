@@ -228,6 +228,67 @@ class UserController {
       res.status(500).json({ message: 'Server error while fetching company users.' });
     }
   }
+  static async addNewUser(req, res) {
+    // req.user is from authMiddleware, req.user.companyId is from the admin's token
+    const { companyId: adminCompanyId } = req.user; 
+    const { name, email, password, role, manager_id } = req.body;
+
+    // Basic validation
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: 'Name, email, password, and role are required.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+    if (!['Employee', 'Manager'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be "Employee" or "Manager".' });
+    }
+
+    try {
+      // Ensure email is unique within the company
+      const existingUser = await UserModel.findByEmail(email);
+      if (existingUser && existingUser.company_id === adminCompanyId) {
+        return res.status(409).json({ message: 'Email already exists in this company.' });
+      }
+      
+      // If manager_id is provided, validate it
+      let finalManagerId = null;
+      if (manager_id) {
+          // Check if the provided manager_id exists and belongs to the same company
+          const isManagerValid = await UserModel.isManagerInCompany(manager_id, adminCompanyId);
+          if (!isManagerValid) {
+              return res.status(400).json({ message: 'Invalid manager_id or manager does not belong to this company.' });
+          }
+          finalManagerId = manager_id;
+      } else if (role === 'Employee') {
+          // An employee MUST have a manager
+          return res.status(400).json({ message: 'Employees must be assigned a manager.' });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const newUser = await UserModel.createUser({
+        company_id: adminCompanyId, // Assign to the admin's company
+        name,
+        email,
+        password_hash: passwordHash,
+        role,
+        manager_id: finalManagerId, // Will be null if role is Manager or no manager_id provided
+      });
+
+      // Filter out sensitive data before sending response
+      const { password_hash, ...responseUser } = newUser;
+
+      res.status(201).json({
+        message: `${role} added successfully.`,
+        user: responseUser,
+      });
+
+    } catch (error) {
+      console.error('Error adding new user:', error);
+      res.status(500).json({ message: 'Server error while adding user.' });
+    }
+  }
 }
 
 module.exports = UserController;

@@ -20,4 +20,6 @@ router.post('/reset-password', UserController.resetPassword);
 
 router.get('/company-users', authMiddleware, adminAuth, UserController.getCompanyUsers);
 
+router.post('/add-user', authMiddleware, adminAuth, UserController.addNewUser);
+
 module.exports = router;
