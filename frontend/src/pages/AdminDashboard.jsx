@@ -7,6 +7,7 @@ export default function AdminDashboard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newUser, setNewUser] = useState({
     name: "",
@@ -15,6 +16,11 @@ export default function AdminDashboard() {
     email: "",
     password: "defaultpassword123"
   });
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+    description: ""
+  });
+  const [categories, setCategories] = useState([]);
 
   // Color Palette
   const colors = {
@@ -27,9 +33,10 @@ export default function AdminDashboard() {
 
   const API_URL = 'http://192.168.137.166:5000';
 
-  // Fetch all users
+  // Fetch all users and categories
   useEffect(() => {
     fetchUsers();
+    fetchCategories();
   }, []);
 
   const fetchUsers = async () => {
@@ -94,6 +101,29 @@ export default function AdminDashboard() {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/categories`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.data.categories) {
+        setCategories(response.data.categories);
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
+      // Fallback categories
+      setCategories([
+        { id: 1, name: 'Travel', description: 'Travel related expenses' },
+        { id: 2, name: 'Meals', description: 'Food and dining expenses' },
+        { id: 3, name: 'Office Supplies', description: 'Office equipment and supplies' }
+      ]);
     }
   };
 
@@ -173,6 +203,44 @@ export default function AdminDashboard() {
         alert(`Error: ${err.response.data.message}`);
       } else {
         alert("Error adding user. Please try again.");
+      }
+    }
+  };
+
+  // Add New Category
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      
+      const categoryData = {
+        name: newCategory.name,
+        description: newCategory.description
+      };
+
+      const response = await axios.post(`${API_URL}/api/categories`, categoryData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Add the new category to the list
+      const addedCategory = response.data.category;
+      setCategories(prev => [...prev, addedCategory]);
+      setShowAddCategory(false);
+      alert(`Category "${newCategory.name}" added successfully!`);
+      
+      // Reset form
+      setNewCategory({
+        name: ""
+      });
+    } catch (err) {
+      console.error("Error adding category:", err);
+      if (err.response?.data?.message) {
+        alert(`Error: ${err.response.data.message}`);
+      } else {
+        alert("Error adding category. Please try again.");
       }
     }
   };
@@ -439,7 +507,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Quick Stats and Recent Activity below the table */}
+            {/* Quick Stats and Add Categories below the table */}
             <div className="row g-4 mt-4">
               {/* Quick Stats Card */}
               <div className="col-12 col-md-6">
@@ -480,66 +548,68 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Recent Activity Card */}
+              {/* Add Categories Card */}
               <div className="col-12 col-md-6">
                 <div className="card shadow-sm border-0 h-100">
                   <div className="card-header border-0 py-3"
                        style={{ backgroundColor: colors.teaGreen }}>
                     <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
-                      <i className="bi bi-activity me-2"></i>
-                      Recent Activity
+                      <i className="bi bi-tags me-2"></i>
+                      Expense Categories
                     </h5>
                   </div>
                   <div className="card-body">
+                    <div className="mb-3">
+                      <button
+                        className="btn w-100 fw-medium border-0 mb-3"
+                        style={{ 
+                          backgroundColor: colors.wine,
+                          color: colors.white
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = colors.charcoal}
+                        onMouseOut={(e) => e.target.style.backgroundColor = colors.wine}
+                        onClick={() => setShowAddCategory(true)}
+                      >
+                        <i className="bi bi-plus-circle me-2"></i>
+                        Add New Category
+                      </button>
+                    </div>
+                    
                     <div className="list-group list-group-flush">
-                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style={{ 
-                               width: '32px', 
-                               height: '32px',
-                               backgroundColor: colors.teaGreen,
-                               color: colors.charcoal,
-                               fontSize: '0.7rem'
-                             }}>
-                          <i className="bi bi-person-plus"></i>
+                      {categories.slice(0, 5).map(category => (
+                        <div key={category.id} className="list-group-item px-0 border-0 d-flex align-items-center">
+                          <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                               style={{ 
+                                 width: '32px', 
+                                 height: '32px',
+                                 backgroundColor: colors.teaGreen,
+                                 color: colors.charcoal,
+                                 fontSize: '0.7rem'
+                               }}>
+                            <i className="bi bi-tag"></i>
+                          </div>
+                          <div className="flex-grow-1">
+                            <small className="d-block fw-medium" style={{ color: colors.charcoal }}>
+                              {category.name}
+                            </small>
+                            <small className="text-muted">
+                              {category.description || 'No description'}
+                            </small>
+                          </div>
                         </div>
-                        <div className="flex-grow-1">
-                          <small className="d-block" style={{ color: colors.charcoal }}>New user added</small>
-                          <small className="text-muted">Sarah Smith - 2 hours ago</small>
+                      ))}
+                      {categories.length === 0 && (
+                        <div className="text-center py-3">
+                          <small style={{ color: colors.wine }}>No categories found</small>
                         </div>
-                      </div>
-                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style={{ 
-                               width: '32px', 
-                               height: '32px',
-                               backgroundColor: colors.teaGreen,
-                               color: colors.charcoal,
-                               fontSize: '0.7rem'
-                             }}>
-                          <i className="bi bi-rule"></i>
+                      )}
+                      {categories.length > 5 && (
+                        <div className="text-center mt-2">
+                          <small style={{ color: colors.wine }}>
+                            +{categories.length - 5} more categories
+                          </small>
                         </div>
-                        <div className="flex-grow-1">
-                          <small className="d-block" style={{ color: colors.charcoal }}>Rules updated</small>
-                          <small className="text-muted">John Doe - 3 hours ago</small>
-                        </div>
-                      </div>
-                      <div className="list-group-item px-0 border-0 d-flex align-items-center">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                             style={{ 
-                               width: '32px', 
-                               height: '32px',
-                               backgroundColor: colors.teaGreen,
-                               color: colors.charcoal,
-                               fontSize: '0.7rem'
-                             }}>
-                          <i className="bi bi-key"></i>
-                        </div>
-                        <div className="flex-grow-1">
-                          <small className="d-block" style={{ color: colors.charcoal }}>Password reset</small>
-                          <small className="text-muted">Mike Johnson - 5 hours ago</small>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -678,6 +748,73 @@ export default function AdminDashboard() {
                     >
                       <i className="bi bi-person-plus me-2"></i>
                       Add User
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD CATEGORY MODAL */}
+      {showAddCategory && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-0" style={{ backgroundColor: colors.teaGreen }}>
+                <h5 className="modal-title fw-bold" style={{ color: colors.charcoal }}>
+                  <i className="bi bi-plus-circle me-2"></i>
+                  Add New Category
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close"
+                  onClick={() => setShowAddCategory(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleAddCategory}>
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Category Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={newCategory.name}
+                      onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                      required
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                      placeholder="Enter category name"
+                    />
+                  </div>
+                  
+                  
+                  <div className="d-flex gap-2 justify-content-end">
+                    <button
+                      type="button"
+                      className="btn border-1"
+                      style={{ 
+                        borderColor: colors.wine,
+                        color: colors.wine,
+                        backgroundColor: 'transparent'
+                      }}
+                      onClick={() => setShowAddCategory(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn border-0"
+                      style={{
+                        backgroundColor: colors.wine,
+                        color: colors.white
+                      }}
+                    >
+                      <i className="bi bi-plus-circle me-2"></i>
+                      Add Category
                     </button>
                   </div>
                 </form>

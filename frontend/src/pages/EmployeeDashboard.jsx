@@ -10,14 +10,15 @@ function EmployeeDashboard() {
     approved: 0
   });
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showDraftAlert, setShowDraftAlert] = useState(false);
   const [newExpense, setNewExpense] = useState({
     description: '',
-    category: '',
-    amount: '',
-    currency: 'USD',
-    expenseDate: new Date().toISOString().split('T')[0],
-    paidBy: '',
-    remarks: ''
+    expense_date: new Date().toISOString().split('T')[0],
+    category_id: '',
+    original_amount: '',
+    original_currency_code: 'USD',
+    receipt_url: '',
+    policy_id: 1
   });
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -35,7 +36,7 @@ function EmployeeDashboard() {
     white: '#FFFFFF'
   };
 
-  const API_URL = 'http://localhost:3000';
+  const API_URL = 'http://192.168.137.166:5000';
 
   // Fetch initial data
   useEffect(() => {
@@ -80,11 +81,20 @@ function EmployeeDashboard() {
 
       if (response.ok) {
         const data = await response.json();
+        // Expecting categories in format: [{id: 1, name: 'Travel'}, {id: 2, name: 'Food'}, ...]
         setCategories(data.categories || []);
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      setCategories(['Food', 'Travel', 'Office', 'Entertainment', 'Transport', 'Other']);
+      // Fallback categories with IDs
+      setCategories([
+        { id: 1, name: 'Travel' },
+        { id: 2, name: 'Food' },
+        { id: 3, name: 'Office Supplies' },
+        { id: 4, name: 'Entertainment' },
+        { id: 5, name: 'Transport' },
+        { id: 6, name: 'Other' }
+      ]);
     }
   };
 
@@ -132,13 +142,21 @@ function EmployeeDashboard() {
     
     try {
       const token = localStorage.getItem('token');
+      
+      // Format data for submission - already in correct format
+      const expenseData = {
+        ...newExpense,
+        original_amount: parseFloat(newExpense.original_amount) || 0,
+        category_id: parseInt(newExpense.category_id) || 1
+      };
+
       const response = await fetch(`${API_URL}/api/employee/expenses`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newExpense)
+        body: JSON.stringify(expenseData)
       });
 
       if (!response.ok) {
@@ -151,12 +169,12 @@ function EmployeeDashboard() {
       setShowExpenseForm(false);
       setNewExpense({
         description: '',
-        category: '',
-        amount: '',
-        currency: 'USD',
-        expenseDate: new Date().toISOString().split('T')[0],
-        paidBy: '',
-        remarks: ''
+        expense_date: new Date().toISOString().split('T')[0],
+        category_id: '',
+        original_amount: '',
+        original_currency_code: 'USD',
+        receipt_url: '',
+        policy_id: 1
       });
       
     } catch (error) {
@@ -165,6 +183,87 @@ function EmployeeDashboard() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Check if form has data before closing
+  const handleCloseExpenseForm = () => {
+    const hasData = newExpense.description || newExpense.category_id || newExpense.original_amount;
+    
+    if (hasData) {
+      setShowDraftAlert(true);
+    } else {
+      setShowExpenseForm(false);
+    }
+  };
+
+  // Save as draft
+  const handleSaveDraft = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Format data exactly as required by the API
+      const draftData = {
+        description: newExpense.description,
+        expense_date: newExpense.expense_date,
+        category_id: parseInt(newExpense.category_id) || 1,
+        original_amount: parseFloat(newExpense.original_amount) || 0,
+        original_currency_code: newExpense.original_currency_code,
+        receipt_url: newExpense.receipt_url || '',
+        policy_id: parseInt(newExpense.policy_id) || 1
+      };
+
+      console.log('Saving draft with data:', draftData);
+
+      const response = await fetch(`${API_URL}/api/claims/draft`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(draftData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save draft');
+      }
+
+      const result = await response.json();
+      
+      // Close both modals and reset form
+      setShowDraftAlert(false);
+      setShowExpenseForm(false);
+      setNewExpense({
+        description: '',
+        expense_date: new Date().toISOString().split('T')[0],
+        category_id: '',
+        original_amount: '',
+        original_currency_code: 'USD',
+        receipt_url: '',
+        policy_id: 1
+      });
+      
+      alert('Expense saved as draft successfully!');
+      
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  // Discard without saving
+  const handleDiscardDraft = () => {
+    setShowDraftAlert(false);
+    setShowExpenseForm(false);
+    setNewExpense({
+      description: '',
+      expense_date: new Date().toISOString().split('T')[0],
+      category_id: '',
+      original_amount: '',
+      original_currency_code: 'USD',
+      receipt_url: '',
+      policy_id: 1
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -252,7 +351,6 @@ function EmployeeDashboard() {
                   <small style={{ color: colors.wine }}>To submit</small>
                 </div>
                 
-                
                 <div className="p-3 rounded border-0" style={{ 
                   backgroundColor: colors.teaGreen
                 }}>
@@ -338,21 +436,21 @@ function EmployeeDashboard() {
                     <button 
                       type="button" 
                       className="btn-close"
-                      onClick={() => setShowExpenseForm(false)}
+                      onClick={handleCloseExpenseForm}
                     ></button>
                   </div>
                   <div className="modal-body">
                     <form onSubmit={handleSubmitExpense}>
                       <div className="row g-3">
                         <div className="col-12">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Description</label>
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Description *</label>
                           <input
                             type="text"
                             name="description"
                             value={newExpense.description}
                             onChange={handleInputChange}
                             className="form-control border-1"
-                            placeholder="Enter description"
+                            placeholder="Enter expense description"
                             style={{ 
                               borderColor: colors.columbiaBlue,
                               color: colors.charcoal
@@ -362,10 +460,26 @@ function EmployeeDashboard() {
                         </div>
                         
                         <div className="col-md-6">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Category</label>
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Expense Date *</label>
+                          <input
+                            type="date"
+                            name="expense_date"
+                            value={newExpense.expense_date}
+                            onChange={handleInputChange}
+                            className="form-control border-1"
+                            style={{ 
+                              borderColor: colors.columbiaBlue,
+                              color: colors.charcoal
+                            }}
+                            required
+                          />
+                        </div>
+
+                        <div className="col-md-6">
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Category *</label>
                           <select
-                            name="category"
-                            value={newExpense.category}
+                            name="category_id"
+                            value={newExpense.category_id}
                             onChange={handleInputChange}
                             className="form-select border-1"
                             style={{ 
@@ -375,19 +489,20 @@ function EmployeeDashboard() {
                             required
                           >
                             <option value="">Select Category</option>
-                            {categories.map(cat => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
+                              <option value="flights">Flights</option>
+                              <option value="hotels">Hotels</option>
+                              <option value="meals">Meals</option>
+                              <option value="other">Other</option>
                           </select>
                         </div>
 
                         <div className="col-md-6">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Amount</label>
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Amount *</label>
                           <div className="input-group">
                             <input
                               type="number"
-                              name="amount"
-                              value={newExpense.amount}
+                              name="original_amount"
+                              value={newExpense.original_amount}
                               onChange={handleInputChange}
                               className="form-control border-1"
                               placeholder="Enter amount"
@@ -396,10 +511,12 @@ function EmployeeDashboard() {
                                 color: colors.charcoal
                               }}
                               required
+                              step="0.01"
+                              min="0"
                             />
                             <select
-                              name="currency"
-                              value={newExpense.currency}
+                              name="original_currency_code"
+                              value={newExpense.original_currency_code}
                               onChange={handleInputChange}
                               className="form-select border-1"
                               style={{ 
@@ -408,60 +525,47 @@ function EmployeeDashboard() {
                                 width: '100px'
                               }}
                             >
-                              {currencies.map(curr => (
-                                <option key={curr} value={curr}>{curr}</option>
-                              ))}
+                              <option key="usd" value="USD">USD</option>
+                              <option key="eur" value="EUR">EUR</option>
+                              <option key="jpy" value="JPY">JPY</option>
+                              <option key="inr" value="INR">INR</option>
                             </select>
                           </div>
                         </div>
 
                         <div className="col-md-6">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Expense Date</label>
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Policy ID</label>
                           <input
-                            type="date"
-                            name="expenseDate"
-                            value={newExpense.expenseDate}
+                            type="number"
+                            name="policy_id"
+                            value={newExpense.policy_id}
                             onChange={handleInputChange}
                             className="form-control border-1"
+                            placeholder="Policy ID"
                             style={{ 
                               borderColor: colors.columbiaBlue,
                               color: colors.charcoal
                             }}
-                            required
+                            min="1"
                           />
-                        </div>
-
-                        <div className="col-md-6">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Paid By</label>
-                          <input
-                            type="text"
-                            name="paidBy"
-                            value={newExpense.paidBy}
-                            onChange={handleInputChange}
-                            className="form-control border-1"
-                            placeholder="Who paid for this?"
-                            style={{ 
-                              borderColor: colors.columbiaBlue,
-                              color: colors.charcoal
-                            }}
-                            required
-                          />
+                          <small className="text-muted">Leave as 1 for default policy</small>
                         </div>
 
                         <div className="col-12">
-                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Remarks</label>
-                          <textarea
-                            name="remarks"
-                            value={newExpense.remarks}
+                          <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Receipt URL</label>
+                          <input
+                            type="url"
+                            name="receipt_url"
+                            value={newExpense.receipt_url}
                             onChange={handleInputChange}
                             className="form-control border-1"
-                            placeholder="Additional remarks"
-                            rows="3"
+                            placeholder="https://example.com/receipts/your-receipt.pdf"
                             style={{ 
                               borderColor: colors.columbiaBlue,
                               color: colors.charcoal
                             }}
                           />
+                          <small className="text-muted">Optional: Link to receipt or document</small>
                         </div>
                       </div>
 
@@ -469,7 +573,7 @@ function EmployeeDashboard() {
                         <button
                           type="button"
                           className="btn border-1"
-                          onClick={() => setShowExpenseForm(false)}
+                          onClick={handleCloseExpenseForm}
                           style={{ 
                             borderColor: colors.wine,
                             color: colors.wine,
@@ -514,6 +618,68 @@ function EmployeeDashboard() {
             </div>
           )}
 
+          {/* Draft Confirmation Modal */}
+          {showDraftAlert && (
+            <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content border-0" style={{ 
+                  backgroundColor: colors.white
+                }}>
+                  <div className="modal-header border-0" style={{ 
+                    backgroundColor: colors.teaGreen
+                  }}>
+                    <h5 className="modal-title" style={{ color: colors.charcoal }}>Save as Draft?</h5>
+                    <button 
+                      type="button" 
+                      className="btn-close"
+                      onClick={handleDiscardDraft}
+                    ></button>
+                  </div>
+                  <div className="modal-body">
+                    <p style={{ color: colors.charcoal }}>
+                      You have unsaved changes. Would you like to save this expense as a draft?
+                    </p>
+                    <div className="d-flex gap-2 justify-content-end">
+                      <button
+                        type="button"
+                        className="btn border-1"
+                        onClick={handleDiscardDraft}
+                        style={{ 
+                          borderColor: colors.wine,
+                          color: colors.wine,
+                          backgroundColor: 'transparent'
+                        }}
+                        onMouseOver={(e) => {
+                          e.target.style.backgroundColor = colors.wine;
+                          e.target.style.color = colors.white;
+                        }}
+                        onMouseOut={(e) => {
+                          e.target.style.backgroundColor = 'transparent';
+                          e.target.style.color = colors.wine;
+                        }}
+                      >
+                        No, Discard
+                      </button>
+                      <button
+                        type="button"
+                        className="btn fw-medium border-0"
+                        onClick={handleSaveDraft}
+                        style={{ 
+                          backgroundColor: colors.wine,
+                          color: colors.white
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = colors.charcoal}
+                        onMouseOut={(e) => e.target.style.backgroundColor = colors.wine}
+                      >
+                        Yes, Save as Draft
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Expenses Table */}
           <div className="card shadow-sm border-0">
             <div className="card-body p-0">
@@ -521,41 +687,46 @@ function EmployeeDashboard() {
                 <table className="table table-hover mb-0">
                   <thead>
                     <tr style={{ backgroundColor: colors.teaGreen }}>
-                      <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Employee</th>
                       <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Description</th>
                       <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Date</th>
                       <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Category</th>
-                      <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Paid By</th>
-                      <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Remarks</th>
                       <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Amount</th>
+                      <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Currency</th>
                       <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Status</th>
-                      <th style={{ color: colors.charcoal, borderColor: colors.columbiaBlue, fontWeight: '600' }}>Approver</th>
                     </tr>
                   </thead>
                   <tbody>
                     {expenses.map(expense => (
                       <tr key={expense.id} style={{ backgroundColor: colors.white }}>
                         <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>
-                          <strong>{expense.employee}</strong>
+                          <strong>{expense.description}</strong>
+                          {expense.receipt_url && (
+                            <div>
+                              <small>
+                                <a href={expense.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: colors.wine }}>
+                                  View Receipt
+                                </a>
+                              </small>
+                            </div>
+                          )}
                         </td>
-                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>{expense.description}</td>
                         <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>
-                          {new Date(expense.date).toLocaleDateString('en-US', { 
+                          {new Date(expense.expense_date).toLocaleDateString('en-US', { 
                             day: 'numeric', 
                             month: 'short', 
                             year: 'numeric' 
                           })}
                         </td>
-                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>{expense.category}</td>
-                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>{expense.paidBy}</td>
-                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>{expense.remarks}</td>
                         <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>
-                          <strong>{formatCurrency(expense.amount, expense.currency)}</strong>
+                          {categories.find(cat => cat.id === expense.category_id)?.name || expense.category_id}
+                        </td>
+                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>
+                          <strong>{expense.original_amount}</strong>
+                        </td>
+                        <td style={{ color: colors.charcoal, borderColor: colors.columbiaBlue }}>
+                          {expense.original_currency_code}
                         </td>
                         <td style={{ borderColor: colors.columbiaBlue }}>{getStatusBadge(expense.status)}</td>
-                        <td style={{ color: colors.wine, borderColor: colors.columbiaBlue }}>
-                          <small>{expense.approver}</small>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
