@@ -10,8 +10,9 @@ export default function AdminDashboard() {
   const [newUser, setNewUser] = useState({
     name: "",
     role: "Employee",
-    manager: "",
+    manager_id: "",
     email: "",
+    password: "defaultpassword123" // Default password
   });
 
   // Color Palette
@@ -23,25 +24,35 @@ export default function AdminDashboard() {
     white: '#FFFFFF'
   };
 
-  const API_URL = 'http://localhost:3000';
+  const API_URL = 'http://192.168.137.166:5000';
 
   // Fetch all users
   useEffect(() => {
     fetchUsers();
-    fetchStats();
   }, []);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/admin/users`, {
+      const response = await axios.get(`${API_URL}/api/users/company-users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      setUsers(response.data.users || response.data);
+      
+      // Transform API response to match our table structure
+      const formattedUsers = response.data.users.map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        manager: user.manager_name || "-",
+        email: user.email,
+        manager_id: user.manager_id
+      }));
+      
+      setUsers(formattedUsers);
     } catch (err) {
       console.error("Error fetching users:", err);
       // Fallback to mock data if API fails
@@ -55,21 +66,6 @@ export default function AdminDashboard() {
       ]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.get(`${API_URL}/api/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      // Handle stats data if needed
-    } catch (err) {
-      console.error("Error fetching stats:", err);
     }
   };
 
@@ -102,20 +98,53 @@ export default function AdminDashboard() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/api/admin/users`, newUser, {
+      
+      // Prepare the data according to your API
+      const userData = {
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        manager_id: newUser.manager_id || null
+      };
+
+      const response = await axios.post(`${API_URL}/api/users/add-user`, userData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
-      setUsers(prev => [...prev, response.data.user || response.data]);
+      // Add the new user to the list with proper formatting
+      const addedUser = response.data.user;
+      const formattedUser = {
+        id: addedUser.id,
+        name: addedUser.name,
+        role: addedUser.role,
+        manager: addedUser.manager_name || "-",
+        email: addedUser.email,
+        manager_id: addedUser.manager_id
+      };
+      
+      setUsers(prev => [...prev, formattedUser]);
       setShowAddUser(false);
       alert(`User ${newUser.name} added successfully!`);
-      setNewUser({ name: "", role: "Employee", manager: "", email: "" });
+      
+      // Reset form
+      setNewUser({ 
+        name: "", 
+        role: "Employee", 
+        manager_id: "", 
+        email: "", 
+        password: "defaultpassword123" 
+      });
     } catch (err) {
-      alert("Error adding user.");
-      console.error(err);
+      console.error("Error adding user:", err);
+      if (err.response?.data?.message) {
+        alert(`Error: ${err.response.data.message}`);
+      } else {
+        alert("Error adding user. Please try again.");
+      }
     }
   };
 
@@ -198,6 +227,9 @@ export default function AdminDashboard() {
         return 'bg-secondary';
     }
   };
+
+  // Get available managers for dropdown
+  const availableManagers = users.filter(user => user.role === 'Manager');
 
   return (
     <div style={{ backgroundColor: colors.columbiaBlue, minHeight: '100vh' }}>
@@ -349,7 +381,7 @@ export default function AdminDashboard() {
                    style={{ backgroundColor: colors.teaGreen }}>
                 <h5 className="card-title mb-0 fw-bold" style={{ color: colors.charcoal }}>
                   <i className="bi bi-people-fill me-2"></i>
-                  User Management
+                  User Management ({users.length} users)
                 </h5>
                 <button
                   className="btn border-0 fw-medium"
@@ -602,41 +634,6 @@ export default function AdminDashboard() {
                   </div>
                   
                   <div className="mb-3">
-                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Role</label>
-                    <select
-                      className="form-select"
-                      value={newUser.role}
-                      onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                      style={{ 
-                        borderColor: colors.columbiaBlue,
-                        color: colors.charcoal
-                      }}
-                    >
-                      <option value="Employee">Employee</option>
-                      <option value="Manager">Manager</option>
-                      <option value="Admin">Admin</option>
-                    </select>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Manager</label>
-                    <select
-                      className="form-select"
-                      value={newUser.manager}
-                      onChange={(e) => setNewUser({ ...newUser, manager: e.target.value })}
-                      style={{ 
-                        borderColor: colors.columbiaBlue,
-                        color: colors.charcoal
-                      }}
-                    >
-                      <option value="">Select Manager</option>
-                      {users.filter(u => u.role === 'Manager').map(manager => (
-                        <option key={manager.id} value={manager.name}>{manager.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="mb-3">
                     <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Email Address</label>
                     <input
                       type="email"
@@ -648,6 +645,64 @@ export default function AdminDashboard() {
                         borderColor: colors.columbiaBlue,
                         color: colors.charcoal
                       }}
+                    />
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Role</label>
+                    <select
+                      className="form-select"
+                      value={newUser.role}
+                      onChange={(e) => setNewUser({ ...newUser, role: e.target.value, manager_id: e.target.value === 'Manager' ? '' : newUser.manager_id })}
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                    >
+                      <option value="Employee">Employee</option>
+                      <option value="Manager">Manager</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+                  
+                  {newUser.role === 'Employee' && (
+                    <div className="mb-3">
+                      <label className="form-label fw-medium" style={{ color: colors.charcoal }}>Manager</label>
+                      <select
+                        className="form-select"
+                        value={newUser.manager_id}
+                        onChange={(e) => setNewUser({ ...newUser, manager_id: e.target.value })}
+                        style={{ 
+                          borderColor: colors.columbiaBlue,
+                          color: colors.charcoal
+                        }}
+                      >
+                        <option value="">Select Manager</option>
+                        {availableManagers.map(manager => (
+                          <option key={manager.id} value={manager.id}>
+                            {manager.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div className="mb-3">
+                    <label className="form-label fw-medium" style={{ color: colors.charcoal }}>
+                      Password
+                      <small className="text-muted ms-1">(Will be sent to user's email)</small>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      required
+                      style={{ 
+                        borderColor: colors.columbiaBlue,
+                        color: colors.charcoal
+                      }}
+                      placeholder="Enter temporary password"
                     />
                   </div>
                   
