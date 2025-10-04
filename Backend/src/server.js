@@ -6,6 +6,8 @@ const path = require('path'); // Ensure path module is imported
 // ⭐️ Add debug: true
 dotenv.config({ path: path.resolve(__dirname, '../.env'), debug: true });
 
+global.unverifiedSignups = {};
+
 // --- VERIFICATION LOGS ---
 console.log('--- Environment Variables Loaded (Attempt 2) ---');
 console.log('DB_HOST:', process.env.DB_HOST);
