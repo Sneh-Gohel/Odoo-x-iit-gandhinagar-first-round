@@ -10,4 +10,7 @@ router.post('/signup', UserController.signupCompanyAdmin);
 // POST /api/users/verify-otp - Verifies OTP and finalizes signup
 router.post('/verify-otp', UserController.verifyOtp); // <--- Make sure this line exists and is correct!
 
+// POST /api/users/login - Logs in a user
+router.post('/login', UserController.loginUser);
+
 module.exports = router;
