@@ -150,10 +150,5 @@ Employees can **scan receipts**, and the OCR engine automatically extracts:
 - ✅ Analytics dashboard for finance teams  
 - ✅ Role-based dashboards and KPI insights  
 
----
-
-## 🏁 Getting Started
-
-### 1. Clone the repository
 
 
