@@ -13,4 +13,7 @@ router.post('/verify-otp', UserController.verifyOtp); // <--- Make sure this lin
 // POST /api/users/login - Logs in a user
 router.post('/login', UserController.loginUser);
 
+router.post('/forgot-password', UserController.forgotPassword);
+router.post('/reset-password', UserController.resetPassword);
+
 module.exports = router;

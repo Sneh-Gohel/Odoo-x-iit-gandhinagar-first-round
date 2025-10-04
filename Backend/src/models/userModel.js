@@ -7,13 +7,6 @@ class UserModel {
     const [rows] = await db.execute('SELECT * FROM Users WHERE email = ?', [email]);
     return rows.length > 0 ? rows[0] : null;
   }
-
-  /**
-   * Creates a new company and a fully verified admin user in a single transaction.
-   * This is only called AFTER OTP verification is successful.
-   * @param {Object} details - Contains companyName, defaultCurrencyCode, adminName, adminEmail, passwordHash
-   * @returns {Promise<Object>} The created user and company details.
-   */
   static async createVerifiedCompanyAndAdmin(details) {
     const { companyName, defaultCurrencyCode, adminName, adminEmail, passwordHash } = details;
     const connection = await db.getConnection();
@@ -44,6 +37,14 @@ class UserModel {
     } finally {
       connection.release();
     }
+  }
+
+  static async updateUserPassword(email, newPasswordHash) {
+    const [result] = await db.execute(
+      'UPDATE Users SET password_hash = ? WHERE email = ?',
+      [newPasswordHash, email]
+    );
+    return result.affectedRows > 0;
   }
 }
 

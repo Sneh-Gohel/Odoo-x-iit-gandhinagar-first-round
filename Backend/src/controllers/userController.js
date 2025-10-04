@@ -2,7 +2,7 @@
 const UserModel = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { sendOtpEmail } = require('../utils/emailService');
+const { sendOtpEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 class UserController {
   /**
@@ -20,15 +20,11 @@ class UserController {
         return res.status(409).json({ message: 'Email already registered.' });
       }
 
-      // Hash the password before storing it temporarily
       const passwordHash = await bcrypt.hash(adminPassword, 10);
-
-      // Generate OTP and expiration
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store the entire payload in our in-memory object
-      unverifiedSignups[adminEmail] = {
+      global.unverifiedSignups[adminEmail] = {
         details: { companyName, defaultCurrencyCode, adminName, adminEmail, passwordHash },
         otp,
         expiresAt,
@@ -57,38 +53,32 @@ class UserController {
     }
 
     try {
-      const pendingSignup = unverifiedSignups[email];
+      const pendingSignup = global.unverifiedSignups[email];
 
-      // Check 1: Is there a pending signup for this email?
       if (!pendingSignup) {
         return res.status(400).json({ message: 'No pending signup for this email, or session expired.' });
       }
 
-      // Check 2: Has the OTP expired?
       if (new Date() > new Date(pendingSignup.expiresAt)) {
-        delete unverifiedSignups[email]; // Clean up expired entry
+        delete global.unverifiedSignups[email];
         return res.status(400).json({ message: 'OTP has expired. Please try signing up again.' });
       }
 
-      // Check 3: Does the OTP match?
       if (pendingSignup.otp !== otp) {
         return res.status(400).json({ message: 'Invalid OTP.' });
       }
 
-      // SUCCESS! Now create the user and company in the database
       const user = await UserModel.createVerifiedCompanyAndAdmin(pendingSignup.details);
 
-      // Clean up the in-memory store
-      delete unverifiedSignups[email];
+      delete global.unverifiedSignups[email];
 
-      // Generate JWT for the new admin
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
         process.env.JWT_SECRET,
         { expiresIn: '1h' }
       );
 
-      res.status(201).json({ // 201 Created is more appropriate here
+      res.status(201).json({
         message: 'Account created and verified successfully! You are now logged in.',
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
         token,
@@ -99,41 +89,33 @@ class UserController {
       res.status(500).json({ message: 'Server error during verification.' });
     }
   }
+  
   static async loginUser(req, res) {
     const { email, password } = req.body;
-
-    // Basic validation
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
 
     try {
-      // 1. Find the user by email
       const user = await UserModel.findByEmail(email);
-
-      // Security: Use a generic error message to prevent "user enumeration"
-      // This way, an attacker can't guess which emails are registered.
       const genericErrorMessage = 'Invalid credentials. Please check your email and password.';
       
       if (!user) {
         return res.status(401).json({ message: genericErrorMessage });
       }
 
-      // 2. Compare the provided password with the stored hash
       const isPasswordMatch = await bcrypt.compare(password, user.password_hash);
 
       if (!isPasswordMatch) {
         return res.status(401).json({ message: genericErrorMessage });
       }
 
-      // 3. If password matches, generate a JWT
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
         process.env.JWT_SECRET,
-        { expiresIn: '1h' } // Token expires in 1 hour
+        { expiresIn: '1h' }
       );
 
-      // SUCCESS!
       res.status(200).json({
         message: 'Login successful!',
         user: { 
@@ -151,8 +133,73 @@ class UserController {
       res.status(500).json({ message: 'Server error during login.' });
     }
   }
+
+  static async forgotPassword(req, res) {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+    try {
+      const user = await UserModel.findByEmail(email);
+      if (!user) {
+        return res.status(200).json({ message: 'If an account with this email exists, a password reset OTP has been sent.' });
+      }
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      global.passwordResetRequests[email] = { otp, expiresAt };
+      
+      // This line will now work correctly
+      await sendPasswordResetEmail(email, otp); 
+      
+      res.status(200).json({ message: 'If an account with this email exists, a password reset OTP has been sent.' });
+    } catch (error) {
+      console.error('Error during forgot password:', error);
+      res.status(500).json({ message: 'Server error during forgot password.' });
+    }
+  }
+
+  static async resetPassword(req, res) {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Email, OTP, and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+
+    try {
+        const resetRequest = global.passwordResetRequests[email];
+
+        if (!resetRequest) {
+            return res.status(400).json({ message: 'No pending password reset for this email, or session expired.' });
+        }
+
+        if (new Date() > new Date(resetRequest.expiresAt)) {
+            delete global.passwordResetRequests[email];
+            return res.status(400).json({ message: 'OTP has expired. Please request a new password reset.' });
+        }
+
+        if (resetRequest.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP.' });
+        }
+
+        const newPasswordHash = await bcrypt.hash(newPassword, 10);
+        const updated = await UserModel.updateUserPassword(email, newPasswordHash);
+
+        if (!updated) {
+            return res.status(404).json({ message: 'User not found or password could not be updated.' });
+        }
+
+        delete global.passwordResetRequests[email];
+        
+        res.status(200).json({ message: 'Password has been reset successfully.' });
+
+    } catch (error) {
+        console.error('Error during password reset:', error);
+        res.status(500).json({ message: 'Server error during password reset.' });
+    }
+  }
 }
-
-
 
 module.exports = UserController;

@@ -9,6 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env'), debug: true });
 
 // ⭐️ Initialize global in-memory store for unverified signups
 global.unverifiedSignups = {};
+global.passwordResetRequests = {};
 
 // --- VERIFICATION LOGS ---
 console.log('--- Environment Variables Loaded ---');
